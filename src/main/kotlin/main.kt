@@ -1,10 +1,11 @@
 import java.util.regex.PatternSyntaxException
+import kotlin.math.max
 import kotlin.random.Random
 
 // goto 1
-const val POP_SIZE = 100
-const val REGEX_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#\$%&\'()*+,-./:;<=>?@[\\]^_`{|}~"
-val regex_start_size_range = 5..15
+const val POP_SIZE = 600
+const val REGEX_CHARS = "abcdefghijklmnopqrstuvwxyz!\"#\$%&\'()*+,-./:;<=>?@[\\]^_`{|}~"
+val regex_start_size_range = 1..2
 const val MUT_PROB = 0.5
 
 fun buildRegex(string: String, size: Int): Regex {
@@ -16,9 +17,22 @@ fun buildRegex(string: String, size: Int): Regex {
 }
 
 fun combineRegex(father: String, mother: String): String {
+//    println("Combine $father and  $mother")
+    val size = listOf(father, mother).random().length
     val firstPart = father.substring((0 until father.length).random())
-    val secondPart = mother.substring((0 until mother.length).random())
-    return firstPart + secondPart
+//    println("firstPart : $firstPart")
+    val secondPart = try {
+        mother.substring((0 until max(mother.length, 0)).random())
+    } catch (e: Exception) {
+        "wsdvc"
+    }
+    //    println("secondPart $secondPart")
+    val rep = (firstPart + secondPart)
+    if (rep.length > size) {
+        return rep.substring(0..size)
+    }
+//    println("Result : $rep")
+    return rep
 }
 
 fun addRandom(string: String, addon: String): String {
@@ -26,45 +40,59 @@ fun addRandom(string: String, addon: String): String {
     return string.substring(0, splitIndex) + addon + string.substring(splitIndex, string.length)
 }
 
+fun removeRandom(string: String): String {
+    val index = (1..string.length).random()
+    return string.removeRange(index - 1, index)
+}
+
 
 fun mutateRegex(regex: String): String {
-    return when((0 until 2).random()) {
+    val rep = when ((0..5).random()) {
         0 -> addRandom(regex, REGEX_CHARS.random().toString())
-        else -> {
-            val indexToRm = (1 until regex.length).random()
-            regex.removeRange(indexToRm - 1, indexToRm)
-        }
+        1 -> removeRandom(regex)
+        else -> regex
     }
+//    println("mutate $regex into $rep")
+    return rep
 }
 
 
 val validMails = listOf(
-    "louis.saglio@sfr.fr",
-    "alainevrard@hotmail.fr",
-    "alainsaillard@wanadoo.fr",
-    "geralain08160@hotmail.fr",
-    "aline.czuba@wanadoo.fr",
-    "annette.ponsin@mairie-charlevillemezieres.fr",
-    "annie.pigeot@cegetel.net",
-    "cbourguignon@club-internet.fr",
-    "jean-francois.lemasson119@orange.fr"
+//    "louis.saglio@sfr.fr",
+//    "alainevrard@hotmail.fr",
+//    "alainsaillard@wanadoo.fr",
+//    "geralain08160@hotmail.fr",
+//    "aline.czuba@wanadoo.fr",
+//    "annette.ponsin@mairie-charlevillemezieres.fr",
+//    "annie.pigeot@cegetel.net",
+//    "cbourguignon@club-internet.fr",
+//    "jean-francois.lemasson119@orange.fr"
+    "a",
+    "aaaa",
+    "aa",
+    "aaaaaaaaaaaaa"
 )
 
 val invalidMails = listOf(
-    "plainaddress",
-    "#@%^%#\$@#\$@#.com",
-    "@domain.com",
-    "Joe Smith <email@domain.com>",
-    "email.domain.com",
-    "email@domain@domain.com",
-    ".email@domain.com",
-    "email.@domain.com"
+//    "plainaddress",
+//    "#@%^%#\$@#\$@#.com",
+//    "@domain.com",
+//    "Joe Smith <email@domain.com>",
+//    "email.domain.com",
+//    "email@domain@domain.com",
+//    ".email@domain.com",
+//    "email.@domain.com"
+    "b",
+    "bb",
+    "bbb",
+    "bbbb",
+    "bbbbbbbbbbbbbbbbbbb"
 )
 
 
-fun main() {
+private fun generateRandomPop(): MutableMap<Regex, Int> {
     // generate random pop
-    var population = mutableMapOf<Regex, Int>()
+    val population = mutableMapOf<Regex, Int>()
     repeat((0 until POP_SIZE).count()) {
         population[buildRegex(REGEX_CHARS, regex_start_size_range.random())] = 0
     }
@@ -84,18 +112,27 @@ fun main() {
         }
         population[regex] = note
     }
+    return population
+}
 
+private fun reproducePop(population: MutableMap<Regex, Int>): MutableMap<Regex, Int> {
     // reproduce pop
     val newPopulation = mutableMapOf<Regex, Int>()
     while (newPopulation.size < POP_SIZE * 2) {
         val father = population.keys.random()
         val mother = population.keys.random()
         try {
-            newPopulation[combineRegex(father.pattern, mother.pattern).toRegex()] = 0
-        } catch (e: PatternSyntaxException) {}
+            if (father !in newPopulation) {
+                newPopulation[father] = 0
+            } else newPopulation[combineRegex(father.pattern, mother.pattern).toRegex()] = 0
+        } catch (e: PatternSyntaxException) {
+//            println("$father")
+        }
     }
-    population = newPopulation
+    return newPopulation
+}
 
+private fun mutatePop(population: MutableMap<Regex, Int>): MutableMap<Regex, Int> {
     // mutate pop
     val toKill = mutableSetOf<Regex>()
     val toAdd = mutableSetOf<Regex>()
@@ -106,11 +143,35 @@ fun main() {
                 try {
                     toAdd.add(mutateRegex(regex.pattern).toRegex())
                     break
-                } catch (e: PatternSyntaxException) {}
+                } catch (e: PatternSyntaxException) {
+                }
             }
         }
     }
+    for (regex in toKill) {
+        population.remove(regex)
+    }
+    for (regex in toAdd) {
+        population[regex] = 0
+    }
+    return population
+}
 
-    // select
-    population.toList().sortedBy { it.second }
+private fun selectPop(population: MutableMap<Regex, Int>) =
+    population.toList().sortedBy { it.second }.slice(0..POP_SIZE).associate { it }.toMutableMap()
+
+fun main() {
+    var population = generateRandomPop()
+    repeat(2000) {
+        if (it % 100 == 0) {
+            println(it)
+            println(population.toList().sortedBy { it1 -> -it1.second }.first())
+        }
+        population = reproducePop(population)
+        mutatePop(population)
+        population = selectPop(population)
+    }
+    (population.toList().sortedBy { -it.second }.slice(0..10).associate { it }.toMutableMap()).forEach {
+        println("${it.key} : ${it.value}")
+    }
 }
